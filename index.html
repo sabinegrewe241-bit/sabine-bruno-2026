@@ -381,7 +381,8 @@ body{background:radial-gradient(circle at 8% 3%,#fffdf8 0%,#f7f2e6 44%,#eee8d7 1
 /* Photo: no slight zoom/reflow on every selection. Keep the image completely still. */
 .feature,.gallery .feature{contain:layout;}
 .feature img,.gallery .feature img{transform:none!important;transition:opacity .45s ease!important;animation:none!important;object-fit:cover;}
-#fimg.is-fading{opacity:.45;}
+#fimg.is-fading{opacity:.08;}
+#fimg{will-change:opacity;}
 .feature:hover img,.gallery .feature:hover img{transform:none!important;}
 .feature .fade{animation:none!important;}
 /* Text sits on a consistent dark-glass surface instead of on busy image details. */
@@ -537,6 +538,48 @@ filter:blur(10px);opacity:.78;transform:rotate(-1.4deg)}
  }
 }
 </style>
+
+<style id="github-pages-fix-2026-10-15">
+/* Fix 1: prevent the large title on the main front image from being clipped at the top. */
+.featurecap,.gallery .featurecap{overflow:visible!important;}
+.featurecap .title,.gallery .featurecap .title{
+  line-height:1.02!important;
+  padding-top:.14em!important;
+  padding-bottom:.02em!important;
+}
+/* Fix 2: keep both arrows vertically centered on the large image in all viewport sizes. */
+.gallery-arrow,.feature .gallery-arrow{
+  top:50%!important;
+  transform:translateY(-50%)!important;
+}
+.gallery-arrow:hover,.feature .gallery-arrow:hover{
+  transform:translateY(-50%) scale(1.09)!important;
+}
+.gallery-arrow:active,.feature .gallery-arrow:active{
+  transform:translateY(-50%) scale(.97)!important;
+}
+</style>
+
+<style id="finestrat-show-entire-why-not">
+/* The awning lettering is part of the image and touches its top edge.
+   Never crop this particular portrait photograph; the other three photos stay unchanged. */
+.feature .gallery-ali-blur{
+  display:none;position:absolute;inset:-22px;width:calc(100% + 44px);
+  height:calc(100% + 44px);object-fit:cover!important;
+  filter:blur(22px) brightness(.84);opacity:1;pointer-events:none;z-index:0;
+}
+.feature.photo-ali .gallery-ali-blur{display:block}
+.feature.photo-ali #fimg{
+  position:relative;z-index:1;
+  height:calc(100% - 28px)!important;
+  margin:14px 0!important;
+  object-fit:contain!important;object-position:center center!important;
+}
+.feature.photo-ali .gallery-dots{
+  left:auto!important;right:15px!important;top:17px!important;
+  transform:none!important;
+}
+</style>
 </head>
 <body>
 
@@ -553,7 +596,7 @@ filter:blur(10px);opacity:.78;transform:rotate(-1.4deg)}
     <div class="copy"><h1 id="title"></h1><p class="intro" id="intro"></p><div class="flair" id="flair"></div></div>
     <div class="gallery" role="region" aria-roledescription="carousel" aria-label="Reisefotos" id="photoGallery">
       <article class="feature" id="galleryFeature" tabindex="0" aria-label="Reisefotos: mit Pfeiltasten oder Wischen wechseln">
-        <img id="fimg" alt="" draggable="false">
+        <img id="galleryBlur" class="gallery-ali-blur" alt="" aria-hidden="true" draggable="false"><img id="fimg" alt="" draggable="false">
         <button type="button" class="gallery-arrow gallery-prev" id="photoPrev" aria-label="Vorheriges Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
         <button type="button" class="gallery-arrow gallery-next" id="photoNext" aria-label="Nächstes Foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
         <div class="gallery-dots" id="galleryDots" aria-hidden="true"></div>
@@ -845,13 +888,35 @@ LABELS.no={
 
 function photoSet(key){
  photo=key;const c=COPY[lang].photos[key],im=$('fimg');
+ const feature=$('galleryFeature');
+ const backdrop=$('galleryBlur');
  $('fsmall').textContent=c.small;$('ftitle').textContent=c.title;$('fsub').textContent=c.sub;
- const loader=new Image();
- loader.onload=()=>{im.classList.add('is-fading');setTimeout(()=>{im.src=IMAGES[key];im.alt=c.title;requestAnimationFrame(()=>im.classList.remove('is-fading'));},140);};
- loader.src=IMAGES[key];
- if(im.src!==IMAGES[key] && !loader.complete){im.classList.add('is-fading');}
  document.querySelectorAll('.pick').forEach(b=>{const selected=b.dataset.key===key;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
  $('galleryDots').innerHTML=PHOTO_ORDER.map(k=>'<i'+(k===key?' class="active"':'')+'></i>').join('');
+ const applyImage=()=>{
+   feature.classList.toggle('photo-ali',key==='ali');
+   if(key==='ali'){backdrop.src=IMAGES.ali;}else{backdrop.removeAttribute('src');}
+   im.src=IMAGES[key];
+   im.alt=c.title;
+   requestAnimationFrame(()=>im.classList.remove('is-fading'));
+ };
+ const currentSrc=im.getAttribute('src')||'';
+ const nextSrc=IMAGES[key];
+ if(currentSrc===nextSrc){
+   feature.classList.toggle('photo-ali',key==='ali');
+   if(key==='ali'){backdrop.src=IMAGES.ali;}else{backdrop.removeAttribute('src');}
+   im.alt=c.title;
+   im.classList.remove('is-fading');
+   return;
+ }
+ im.classList.add('is-fading');
+ const loader=new Image();
+ let applied=false;
+ const finish=()=>{if(applied)return;applied=true;setTimeout(applyImage,240);};
+ loader.onload=finish;
+ loader.onerror=finish;
+ loader.src=nextSrc;
+ if(loader.complete){finish();}
 }
 function renderPicks(){
  const box=$('picks');box.replaceChildren();
